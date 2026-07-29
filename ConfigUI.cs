@@ -20,51 +20,51 @@ internal class ConfigUI(PriceInsightPlugin plugin) : IDisposable {
         }
 
         var conf = plugin.Configuration;
-        if (ImGui.Begin("Price Insight Config", ref settingsVisible,
+        if (ImGui.Begin("Price Insight 設定", ref settingsVisible,
                 ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.AlwaysAutoResize)) {
             var configValue = conf.RefreshWithAlt;
-            if (ImGui.Checkbox("Tap Alt to refresh prices", ref configValue)) {
+            if (ImGui.Checkbox("按下 Alt 重新整理價格", ref configValue)) {
                 conf.RefreshWithAlt = configValue;
                 conf.Save();
             }
 
             configValue = conf.PrefetchInventory;
-            if (ImGui.Checkbox("Prefetch prices for items in inventory", ref configValue)) {
+            if (ImGui.Checkbox("預先取得持有物品的價格", ref configValue)) {
                 conf.PrefetchInventory = configValue;
                 conf.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Prefetch prices for all items in inventory, chocobo saddlebag and retainer when logging in.");
+                ImGui.SetTooltip("登入時預先取得物品欄、陸行鳥鞍囊及雇員所持全部物品的價格。");
 
             configValue = conf.UseCurrentWorld;
-            if (ImGui.Checkbox("Use current world as home world", ref configValue)) {
+            if (ImGui.Checkbox("將目前世界視為所屬世界", ref configValue)) {
                 conf.UseCurrentWorld = configValue;
                 conf.Save();
                 plugin.ClearCache();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("The current world you're on will be considered your \"home world\".\nUseful if you're datacenter travelling and want to see prices there.");
+                ImGui.SetTooltip("將你目前所在的世界視為「所屬世界」。\n跨資料中心旅行時，可用來查看當地價格。");
 
             ImGui.Separator();
             ImGui.PushID(0);
 
-            ImGui.Text("Show cheapest price in:");
+            ImGui.Text("顯示下列範圍的最低價格：");
 
             configValue = conf.ShowRegion;
-            if (ImGui.Checkbox("Region", ref configValue)) {
+            if (ImGui.Checkbox("地區", ref configValue)) {
                 conf.ShowRegion = configValue;
                 conf.Save();
             }
             TooltipRegion();
 
             configValue = conf.ShowDatacenter;
-            if (ImGui.Checkbox("Datacenter", ref configValue)) {
+            if (ImGui.Checkbox("資料中心", ref configValue)) {
                 conf.ShowDatacenter = configValue;
                 conf.Save();
             }
 
             configValue = conf.ShowWorld;
-            if (ImGui.Checkbox("Home world", ref configValue)) {
+            if (ImGui.Checkbox("所屬世界", ref configValue)) {
                 conf.ShowWorld = configValue;
                 conf.Save();
             }
@@ -73,23 +73,23 @@ internal class ConfigUI(PriceInsightPlugin plugin) : IDisposable {
             ImGui.Separator();
             ImGui.PushID(1);
 
-            ImGui.Text("Show most recent purchase in:");
+            ImGui.Text("顯示下列範圍的最近成交：");
 
             configValue = conf.ShowMostRecentPurchaseRegion;
-            if (ImGui.Checkbox("Region", ref configValue)) {
+            if (ImGui.Checkbox("地區", ref configValue)) {
                 conf.ShowMostRecentPurchaseRegion = configValue;
                 conf.Save();
             }
             TooltipRegion();
 
             configValue = conf.ShowMostRecentPurchase;
-            if (ImGui.Checkbox("Datacenter", ref configValue)) {
+            if (ImGui.Checkbox("資料中心", ref configValue)) {
                 conf.ShowMostRecentPurchase = configValue;
                 conf.Save();
             }
 
             configValue = conf.ShowMostRecentPurchaseWorld;
-            if (ImGui.Checkbox("Home world", ref configValue)) {
+            if (ImGui.Checkbox("所屬世界", ref configValue)) {
                 conf.ShowMostRecentPurchaseWorld = configValue;
                 conf.Save();
             }
@@ -98,52 +98,52 @@ internal class ConfigUI(PriceInsightPlugin plugin) : IDisposable {
             ImGui.Separator();
 
             var selectValue = conf.ShowDailySaleVelocityIn;
-            if (ImGui.Combo("Show sales per day", ref selectValue, ["Do not show", "World", "Datacenter", "Region"])) {
+            if (ImGui.Combo("顯示每日成交量", ref selectValue, ["不顯示", "世界", "資料中心", "地區"])) {
                 conf.ShowDailySaleVelocityIn = selectValue;
                 conf.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Show the average sales per day based on sales of the last 4 days.");
+                ImGui.SetTooltip("依最近 4 天的成交紀錄顯示平均每日成交量。");
 
             selectValue = conf.ShowAverageSalePriceIn;
-            if (ImGui.Combo("Show average sale price", ref selectValue, ["Do not show", "World", "Datacenter", "Region"])) {
+            if (ImGui.Combo("顯示平均成交價格", ref selectValue, ["不顯示", "世界", "資料中心", "地區"])) {
                 conf.ShowAverageSalePriceIn = selectValue;
                 conf.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Show the average sale price based on sales of the last 4 days.");
+                ImGui.SetTooltip("依最近 4 天的成交紀錄顯示平均成交價格。");
 
             configValue = conf.ShowStackSalePrice;
-            if (ImGui.Checkbox("Show stack sale price", ref configValue)) {
+            if (ImGui.Checkbox("顯示整組售價", ref configValue)) {
                 conf.ShowStackSalePrice = configValue;
                 conf.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Show the price of the hovered stack if sold at the given unit price.");
+                ImGui.SetTooltip("依顯示的單價計算滑鼠所指整組物品的售價。");
 
             configValue = conf.ShowAge;
-            if (ImGui.Checkbox("Show age of data", ref configValue)) {
+            if (ImGui.Checkbox("顯示資料更新時間", ref configValue)) {
                 conf.ShowAge = configValue;
                 conf.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Show when the price info was last refreshed.\nCan be turned off to reduce tooltip bloat.");
+                ImGui.SetTooltip("顯示價格資訊最後更新至今的時間。\n可停用以縮短物品說明。");
 
             configValue = conf.ShowDatacenterOnCrossWorlds;
-            if (ImGui.Checkbox("Show datacenter for foreign worlds", ref configValue)) {
+            if (ImGui.Checkbox("其他世界顯示資料中心", ref configValue)) {
                 conf.ShowDatacenterOnCrossWorlds = configValue;
                 conf.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Show the datacenter for worlds from other datacenters when displaying prices for the entire region.\nCan be turned off to reduce tooltip bloat.");
+                ImGui.SetTooltip("顯示整個地區的價格時，為其他資料中心的世界標示其資料中心。\n可停用以縮短物品說明。");
 
             configValue = conf.ShowBothNqAndHq;
-            if (ImGui.Checkbox("Always display NQ and HQ prices", ref configValue)) {
+            if (ImGui.Checkbox("永遠同時顯示 NQ 與 HQ 價格", ref configValue)) {
                 conf.ShowBothNqAndHq = configValue;
                 conf.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Show the prices for both NQ and HQ of an item.\nWhen turned off will only display price for the current quality (use Ctrl to switch between NQ and HQ).");
+                ImGui.SetTooltip("同時顯示物品的 NQ 與 HQ 價格。\n停用時僅顯示目前品質的價格（按 Ctrl 可切換 NQ 與 HQ）。");
         }
 
         ImGui.End();
@@ -151,6 +151,6 @@ internal class ConfigUI(PriceInsightPlugin plugin) : IDisposable {
 
     private static void TooltipRegion() {
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Include all datacenters available via datacenter traveling.");
+            ImGui.SetTooltip("包含可透過資料中心旅行前往的所有資料中心。");
     }
 }
