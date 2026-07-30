@@ -2,7 +2,7 @@
 	<!-- Assembly Configuration -->
 	<PropertyGroup>
 		<AssemblyName>PriceInsight</AssemblyName>
-		<Version>2.11.3.1</Version>
+		<Version>2.11.3.2</Version>
 	</PropertyGroup>
 
 	<!-- NuGet Packages -->

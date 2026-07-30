@@ -32,9 +32,9 @@ public class UniversalisClientV2 : IDisposable {
     public async Task<Dictionary<uint, MarketBoardData>?> GetMarketBoardDataList(
         uint homeWorldId, ICollection<uint> itemId, CancellationToken cancellationToken) {
         try {
-            using var result =
-                await httpClient.GetAsync($"https://universalis.app/api/v2/aggregated/{homeWorldId}/{string.Join(',', itemId.Select(i => i.ToString()))}",
-                    cancellationToken);
+            var requestUri =
+                $"https://universalis.app/api/v2/aggregated/{homeWorldId}/{string.Join(',', itemId.Select(i => i.ToString()))}";
+            using var result = await GetWithRetryAsync(requestUri, cancellationToken);
 
             if (result.StatusCode != HttpStatusCode.OK) {
                 throw new HttpRequestException("Invalid status code " + result.StatusCode, null, result.StatusCode);
@@ -59,6 +59,37 @@ public class UniversalisClientV2 : IDisposable {
             return null;
         }
     }
+
+    private async Task<HttpResponseMessage> GetWithRetryAsync(string requestUri, CancellationToken cancellationToken) {
+        const int maxAttempts = 3;
+
+        for (var attempt = 1; ; attempt++) {
+            try {
+                var response = await httpClient.GetAsync(requestUri, cancellationToken);
+                if (!IsTransient(response.StatusCode) || attempt >= maxAttempts)
+                    return response;
+
+                Service.PluginLog.Debug(
+                    "Universalis returned {StatusCode}; retrying request ({Attempt}/{MaxAttempts}).",
+                    response.StatusCode, attempt, maxAttempts);
+                response.Dispose();
+            } catch (HttpRequestException ex) when (attempt < maxAttempts && !cancellationToken.IsCancellationRequested) {
+                Service.PluginLog.Debug(
+                    ex, "Temporary Universalis request failure; retrying ({Attempt}/{MaxAttempts}).",
+                    attempt, maxAttempts);
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(attempt == 1 ? 400 : 1200), cancellationToken);
+        }
+    }
+
+    private static bool IsTransient(HttpStatusCode statusCode) =>
+        statusCode == HttpStatusCode.RequestTimeout ||
+        statusCode == HttpStatusCode.TooManyRequests ||
+        statusCode == HttpStatusCode.InternalServerError ||
+        statusCode == HttpStatusCode.BadGateway ||
+        statusCode == HttpStatusCode.ServiceUnavailable ||
+        statusCode == HttpStatusCode.GatewayTimeout;
 
     public void Dispose() {
         httpClient.Dispose();
