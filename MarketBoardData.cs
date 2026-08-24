@@ -10,6 +10,17 @@ public record MarketBoardData {
     public required string HomeWorld { get; init; }
     public required string Datacenter { get; init; }
     public required string Region { get; init; }
+
+    public bool HasAnyData() =>
+        HasData(MinimumPrice) ||
+        HasData(MostRecentPurchase) ||
+        HasData(AverageSalePrice) ||
+        HasData(DailySaleVelocity);
+
+    private static bool HasData<T>(Group<T> group) =>
+        group.World.Nq is not null || group.World.Hq is not null ||
+        group.Datacenter.Nq is not null || group.Datacenter.Hq is not null ||
+        group.Region.Nq is not null || group.Region.Hq is not null;
 }
 
 public record Group<T> {

@@ -11,9 +11,15 @@ using Lumina.Excel.Sheets;
 namespace PriceInsight;
 
 public class ItemPriceLookup : IDisposable {
+    private static readonly TimeSpan SuccessfulCacheDuration = TimeSpan.FromMinutes(90);
+    private static readonly TimeSpan EmptyCacheDuration = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan FailureCooldown = TimeSpan.FromMinutes(5);
+
     private readonly InMemoryCaching cache = new("prices", new InMemoryCachingOptions { EnableReadDeepClone = false });
     private readonly ConcurrentQueue<uint> requestedItems = new();
+    private readonly ConcurrentQueue<uint> priorityRequestedItems = new();
     private readonly ConcurrentDictionary<uint, (Task Task, CancellationTokenSource Token)> activeTasks = new();
+    private readonly ConcurrentDictionary<uint, DateTime> failedItems = new();
     private readonly PriceInsightPlugin plugin;
     private readonly CancellationTokenSource cancellationTokenSource = new();
     private uint? homeWorldId;
@@ -41,6 +47,7 @@ public class ItemPriceLookup : IDisposable {
 
         if (refresh) {
             cache.Remove(itemId.ToString());
+            failedItems.TryRemove(itemId, out _);
             if (activeTasks.TryRemove(itemId, out var t))
                 t.Token.Cancel();
         } else {
@@ -48,9 +55,16 @@ public class ItemPriceLookup : IDisposable {
                 return (mbData, LookupState.Marketable);
             if (activeTasks.TryGetValue(itemId, out var t))
                 return (null, t.Task.IsFaulted ? LookupState.Faulted : LookupState.Marketable);
+            if (failedItems.TryGetValue(itemId, out var failedAt)) {
+                if (DateTime.UtcNow - failedAt < FailureCooldown)
+                    return (null, LookupState.Faulted);
+                failedItems.TryRemove(itemId, out _);
+            }
         }
 
-        requestedItems.Enqueue(itemId);
+        // Direct tooltip requests take priority over background inventory prefetches.
+        if (!priorityRequestedItems.Contains(itemId))
+            priorityRequestedItems.Enqueue(itemId);
 
         return (null, LookupState.Marketable);
     }
@@ -70,6 +84,8 @@ public class ItemPriceLookup : IDisposable {
                 continue;
             if (cache.Get(itemId.ToString()) != null || (activeTasks.TryGetValue(itemId, out var t) && !t.Task.IsFaulted))
                 continue;
+            if (failedItems.TryGetValue(itemId, out var failedAt) && DateTime.UtcNow - failedAt < FailureCooldown)
+                continue;
             if (!requestedItems.Contains(itemId))
                 requestedItems.Enqueue(itemId);
         }
@@ -78,11 +94,18 @@ public class ItemPriceLookup : IDisposable {
     private async Task ProcessQueue() {
         var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
         while (await timer.WaitForNextTickAsync(cancellationTokenSource.Token)) {
-            if (requestedItems.IsEmpty)
+            if (priorityRequestedItems.IsEmpty && requestedItems.IsEmpty)
                 continue;
             var items = new HashSet<uint>();
-            while (items.Count < 50 && requestedItems.TryDequeue(out var item))
-                items.Add(item);
+            // Do not combine an interactive lookup with a potentially slow prefetch batch.
+            var queue = priorityRequestedItems.IsEmpty ? requestedItems : priorityRequestedItems;
+            var limit = ReferenceEquals(queue, priorityRequestedItems) ? 10 : 30;
+            while (items.Count < limit && queue.TryDequeue(out var item)) {
+                if (cache.Get(item.ToString()) == null && !activeTasks.ContainsKey(item))
+                    items.Add(item);
+            }
+            if (items.Count == 0)
+                continue;
             await FetchInternal(items);
         }
 
@@ -96,8 +119,13 @@ public class ItemPriceLookup : IDisposable {
         foreach (var id in itemIds) {
             var task = Task.Run(async () => {
                 var items = await itemTask;
-                if (items != null && items.TryGetValue(id, out var value))
-                    cache.Set(id.ToString(), value, TimeSpan.FromMinutes(90));
+                if (items != null && items.TryGetValue(id, out var value)) {
+                    var duration = value.HasAnyData() ? SuccessfulCacheDuration : EmptyCacheDuration;
+                    cache.Set(id.ToString(), value, duration);
+                    failedItems.TryRemove(id, out _);
+                } else {
+                    failedItems[id] = DateTime.UtcNow;
+                }
                 activeTasks.TryRemove(id, out _);
             }, token.Token);
             task.ContinueWith(_ => { }, TaskContinuationOptions.OnlyOnCanceled);
@@ -111,10 +139,14 @@ public class ItemPriceLookup : IDisposable {
                 return null;
             var fetchStart = DateTime.Now;
             var result = await plugin.UniversalisClientV2.GetMarketBoardDataList(homeWorldId.Value, itemIds, token.Token);
-            if (result != null)
+            if (result != null) {
                 plugin.ItemPriceTooltip.Refresh(result);
-            else
+                var unresolvedItems = itemIds.Where(id => !result.ContainsKey(id)).ToArray();
+                if (unresolvedItems.Length > 0)
+                    plugin.ItemPriceTooltip.FetchFailed(unresolvedItems);
+            } else {
                 plugin.ItemPriceTooltip.FetchFailed(itemIds);
+            }
             Service.PluginLog.Debug($"Fetching {itemIds.Count} items took {(DateTime.Now - fetchStart).TotalMilliseconds:F0}ms");
             return result;
         }
