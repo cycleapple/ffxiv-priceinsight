@@ -105,6 +105,14 @@ public class UniversalisClientV2 : IDisposable {
         var requestUri =
             $"https://universalis.app/api/v3/market/overview/{string.Join(',', worldIds)}/{itemId}";
         using var result = await GetWithRetryAsync(requestUri, cancellationToken);
+        // Universalis may return 404 for an item which exists in the local game data but
+        // has not been added to its marketable-item list yet. Treat that as an empty market
+        // response so the lookup can be cached and the rest of the requested items still load.
+        if (result.StatusCode == HttpStatusCode.NotFound) {
+            Service.PluginLog.Debug("Universalis overview has no market data for itemId {ItemId}.", itemId);
+            return new MarketOverview { item = itemId }.ToMarketBoardData(homeWorldId, worldIds);
+        }
+
         if (result.StatusCode != HttpStatusCode.OK)
             throw new HttpRequestException("Invalid fallback status code " + result.StatusCode, null, result.StatusCode);
 
