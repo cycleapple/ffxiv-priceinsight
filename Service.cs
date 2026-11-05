@@ -1,4 +1,4 @@
-﻿using Dalamud.IoC;
+using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 
@@ -7,6 +7,7 @@ namespace PriceInsight;
 #pragma warning disable 8618
 // ReSharper disable UnusedAutoPropertyAccessor.Local
 internal class Service {
+    [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; }
     [PluginService] internal static ICommandManager CommandManager { get; private set; }
     [PluginService] internal static IClientState ClientState { get; private set; }
     [PluginService] internal static IDataManager DataManager { get; private set; }
